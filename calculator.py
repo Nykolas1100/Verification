@@ -6,41 +6,60 @@ class Expr(abc.ABC):
         ...
 
 class num(Expr):
-    def __init__(self, number):
+    def __init__(self, number: int):
         self.val = number
     def evaluate(self):
-        return self.val
+        return self
     def __str__(self):
         return str(self.val)
     
 class plus(Expr):
-    def __init__(self, exprLeft, exprRight):
+    def __init__(self, exprLeft: Expr, exprRight: Expr):
         self.left = exprLeft
         self.right = exprRight
     def evaluate(self):
-        return self.left.evaluate()+self.right.evaluate()
+        left = self.left.evaluate()
+        right = self.right.evaluate()
+        return num(left.val + right.val)
     def __str__(self):
         return f"({self.left}) + ({self.right})"
     
 class minus(Expr):
-    def __init__(self, exprLeft, exprRight):
+    def __init__(self, exprLeft: Expr, exprRight: Expr):
         self.left = exprLeft
         self.right = exprRight
     def evaluate(self):
-        return self.left.evaluate()-self.right.evaluate()
+        left = self.left.evaluate()
+        right = self.right.evaluate()
+        return num(left.val - right.val)
     def __str__(self):
         return f"({self.left}) - ({self.right})"
+    
+class boolean(Expr):
+    def __init__(self, value: bool):
+        self.val = value
+    
+    def evaluate(self):
+        return self
+    
+    def __str__(self):
+        return "True" if self.val else "False"
 
 class equal(Expr):
-    def __init__(self, exprLeft, exprRight):
+    def __init__(self, exprLeft: Expr, exprRight: Expr):
         self.left = exprLeft
         self.right = exprRight
     def evaluate(self):
-        return self.left.evaluate()==self.right.evaluate()
+        left = self.left.evaluate()
+        right = self.right.evaluate()
+        if left.val == right.val:
+            return num(right.val)
+        return boolean(False)
+        # return self.left.evaluate()==self.right.evaluate()
     def __str__(self):
         return f"({self.left}) = ({self.right})"
     
-def combining(left, middle, right):
+def combining(left: Expr, middle: str, right: Expr):
     # print("combining: " + str(left) + " " + str(middle) + " " + str(right))
     match middle:
         case "+":
@@ -49,7 +68,11 @@ def combining(left, middle, right):
             return minus(left, right)
         case "=":
             return equal(left, right)
-    
+        
+def helper(left: Expr, rest: Expr):
+    for _, right in rest:
+        left = equal(left, right)
+    return left
 
 (expr, exprImpl) = recparser()
 
@@ -65,7 +88,9 @@ n: Parser[Expr] = (pmany1(digit) > (lambda digits: num(int("".join(digits))))) ^
 
 paren: Parser[Expr] = pbetween(lparen, expr, rparen) ^ "paren"
 
-suffix: Parser[Expr] = pseq(equality, expr) | (pseq(addition, expr) | pseq(subtraction, expr)) ^ "suffix"
+# pseq(equality, expr) | 
+
+suffix: Parser[Expr] = (pseq(addition, expr) | pseq(subtraction, expr)) ^ "suffix"
 
 prefix: Parser[Expr] = ((pseq(n, suffix) > (lambda parsed: combining(parsed[0], parsed[1][0], parsed[1][1]) if parsed[1] else parsed[0])) | n) ^ "prefix"
 
@@ -73,11 +98,11 @@ exprImpl[0] = ((pseq(paren, suffix) > (lambda parsed: combining(parsed[0], parse
 
 # grammar: Parser[Expr] = pleft(expr, peof()) ^ "grammar"
 
-equation: Parser[Expr] = (((pseq(pleft(expr, equality), expr))) > (lambda parsed: combining(parsed[0], "=", parsed[1]))) | expr ^ "equation"
+# equation: Parser[Expr] = (((pseq(pleft(expr, equality), expr))) > (lambda parsed: combining(parsed[0], "=", parsed[1]))) | expr ^ "equation"
 
-equations: Parser[Expr] = (pmany1(((pseq(pleft(expr, equality), expr)))) > (lambda parsed: combining(parsed[0], "=", parsed[1]))) | expr ^ "equation"
+equations: Parser[Expr] = ((pseq(expr, pmany1(pseq(equality, expr)))) > (lambda parsed: helper(parsed[0], parsed[1]))) | expr ^ "equation"
 
-grammar: Parser[Expr] = pleft(equation, peof()) ^ "grammar"
+grammar: Parser[Expr] = pleft(equations, peof()) ^ "grammar"
 
 # # parse left and right of addition
 # p: Parser[Expr] = (pseq(n, pright(addition, n)) > (lambda parsed: plus(parsed[0], parsed[1]))) ^ "p"
@@ -111,7 +136,7 @@ def isEquation(expression):
                 return 1 + count(e.left) + count(e.right)
             case _:
                 return 0
-    print("count = " + str(count(expression)))
+    # print("count = " + str(count(expression)))
     return count(expression) == 1
 
 def isEqual(expression):
@@ -131,7 +156,7 @@ def main():
     # print(equals)
     # print(isEquation(equals))
     user = input("Enter your code: ")
-    code = grammar(Input(user, is_debug = True)).result
+    code = grammar(Input(user, is_debug = False)).result
     print(code)
     if not(balanced(code)):
         print("equation unbalanced")
@@ -163,11 +188,15 @@ def main():
 if __name__=="__main__":
     main()
 
-# Anil Seth how your brain hallucinates your consious reality
-
-# Working
-# Option 1: parentheses around left associative functions
-# Option 2: assume one equals sign and fail parsing if another shows up
-#To-do
-# Option 3: implement parser to search for an equals sign across the whole
-# Option 4: pmany expr, eqauls, expr but then fold issue
+# Return an expr to create a closed language - dynamic type checks for each data type
+# Add unit tests!
+# Move events from today to tomorrow
+# Data structure with partial programs
+# Prevent hallucination of missing values
+# Parse calendar language
+# Watermark with whitespace - different types - ID
+# Fingerprint prompt
+# Matt Frederickson
+# Start with hard then consider soft constraints
+# Responsibility of language versus the verifier
+# Fuzz test - random input explosion
